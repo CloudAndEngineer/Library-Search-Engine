@@ -1,3 +1,7 @@
+# $ pip install rapidfuzz
+# Only run on windows python runtime or idle
+# Have to modify csv filename(Must Use Absolute Path)
+
 import csv
 import tkinter as tk
 from tkinter import ttk
@@ -7,8 +11,8 @@ from rapidfuzz import fuzz
 # Load CSV
 def load_books():
     books = []
-    with open(r"E:\동건\가천대\2025-2\알고리즘\Project\books.csv", encoding="utf-8") as f:
-        reader = csv.DictReader(f)
+    with open(r"E:\동건\가천대\2025-2\알고리즘\Project\기말프로젝트-202436824-김동건\books.csv", encoding="utf-8") as f:
+        reader = csv.DictReader(f) # Convert CSV File to Dictionary Structure
         for row in reader:
             books.append(row)
     return books
@@ -39,12 +43,12 @@ def search_books():
     rv_min, rv_max = int(reviews_min_entry.get() or 0), int(reviews_max_entry.get() or 1000000)
     year_min, year_max = int(date_min_entry.get() or 0), int(date_max_entry.get() or 2100)
 
-    results = []
+    results = [] # List data structure to save search results
 
-    for row in books_data:
+    for row in books_data: # searching books: linear search algorithm
 
         # ---------- NLP SCORE ----------
-        if query:
+        if query: # filtering books: rapidfuzz algorithm
             title_score = fuzz.partial_ratio(query, row["title"].lower())
             author_score = fuzz.partial_ratio(query, row["authors"].lower())
             pub_score = fuzz.partial_ratio(query, row["publisher"].lower())
@@ -88,6 +92,7 @@ def search_books():
     # -------------------------- SORTING PRIORITY --------------------------
     # STRICT ORDER:
     # NLP → Pages → Date → Language → Rating → Ratings Count → Reviews
+    # Sorting Books: Tim Sort Algorithm (MUST BE STABLE)
 
     # 7) Reviews
     if filters_enabled["reviews"]:
@@ -172,7 +177,7 @@ lang_filter_var = tk.BooleanVar()
 
 
 # NLP sorting filter
-tk.Checkbutton(window, text="NLP Accuracy First", variable=nlp_filter_var).grid(row=1, column=0, sticky="w")
+tk.Checkbutton(window, text="NLP Accuracy", variable=nlp_filter_var).grid(row=1, column=0, sticky="w")
 tk.Radiobutton(window, text="⬆", value="asc", variable=nlp_order).grid(row=1, column=1)
 tk.Radiobutton(window, text="⬇", value="desc", variable=nlp_order).grid(row=1, column=2)
 
@@ -222,7 +227,7 @@ tk.Radiobutton(window, text="⬇", value="desc", variable=lang_order).grid(row=7
 # Results table
 cols = (
     "ID", "Title", "Author", "Rating", "ISBN", "Lang", "Pages",
-    "Ratings", "Reviews", "Year", "Publisher", "NLP Score"
+    "Ratings", "Reviews", "Year", "Publisher", "Accuracy"
 )
 
 tree = ttk.Treeview(window, columns=cols, show="headings", height=18)
