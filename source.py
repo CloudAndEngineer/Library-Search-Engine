@@ -41,7 +41,7 @@ def search_books():
 
     for row in books_data:
 
-        # Fuzzy NLP Matching
+        # Fuzzy NLP Matching (fixes search-at-end string issue)
         if query:
             score_title = fuzz.partial_ratio(query, row['title'].lower())
             score_author = fuzz.partial_ratio(query, row['authors'].lower())
@@ -72,21 +72,21 @@ def search_books():
 
         results.append((row, nlp_score))
 
-    # Sorting logic
+    # Sorting logic WITH ASC/DESC settings
     if any(filters_enabled.values()):
         sort_rules = [
-            ("pages", lambda x: int(x["num_pages"])),
-            ("date", lambda x: int(x["publication_date"].split("/")[-1])),
-            ("language", lambda x: x["language_code"]),
-            ("rating", lambda x: float(x["average_rating"])),
-            ("ratings_count", lambda x: int(x["ratings_count"])),
-            ("reviews", lambda x: int(x["text_reviews_count"]))
+            ("pages", lambda x: int(x["num_pages"]), pages_order.get()),
+            ("date", lambda x: int(x["publication_date"].split("/")[-1]), date_order.get()),
+            ("language", lambda x: x["language_code"], lang_order.get()),
+            ("rating", lambda x: float(x["average_rating"]), rating_order.get()),
+            ("ratings_count", lambda x: int(x["ratings_count"]), ratings_order.get()),
+            ("reviews", lambda x: int(x["text_reviews_count"]), reviews_order.get())
         ]
 
-        active_rules = [rule for key, rule in sort_rules if filters_enabled[key]]
+        active_rules = [(func, direction) for key, func, direction in sort_rules if filters_enabled[key]]
 
-        for rule in reversed(active_rules):
-            results.sort(key=lambda r: rule(r[0]), reverse=True)
+        for func, direction in reversed(active_rules):  
+            results.sort(key=lambda r: func(r[0]), reverse=(direction == "desc"))
 
     else:
         results.sort(key=lambda r: int(r[0]['bookID']))
@@ -112,13 +112,20 @@ window = tk.Tk()
 window.title("Book Search Engine")
 
 
-# Search Bar Row
+# Sort order variables
+rating_order = tk.StringVar(value="desc")
+pages_order = tk.StringVar(value="desc")
+ratings_order = tk.StringVar(value="desc")
+reviews_order = tk.StringVar(value="desc")
+date_order = tk.StringVar(value="desc")
+lang_order = tk.StringVar(value="asc")
+
+
+# Search Row
 tk.Label(window, text="Keyword Search:").grid(row=0, column=0, padx=5, pady=5)
 search_entry = tk.Entry(window, width=40)
 search_entry.grid(row=0, column=1, padx=5, pady=5)
-
-search_button = tk.Button(window, text="Search", width=12, command=search_books)
-search_button.grid(row=0, column=2, padx=10)
+tk.Button(window, text="🔍 Search", width=12, command=search_books).grid(row=0, column=2, padx=10)
 
 
 # Filter Controls
@@ -130,7 +137,7 @@ date_filter_var = tk.BooleanVar()
 lang_filter_var = tk.BooleanVar()
 
 
-def make_filter(label, row, entry_min_init, entry_max_init):
+def make_filter(label, row, entry_min_init, entry_max_init, order_var):
     var = globals()[f"{label}_filter_var"]
     tk.Checkbutton(window, text=label.replace("_", " ").title(), variable=var).grid(row=row, column=0, sticky="w")
 
@@ -138,38 +145,43 @@ def make_filter(label, row, entry_min_init, entry_max_init):
     entry_max = tk.Entry(window, width=6)
     entry_min.insert(0, entry_min_init)
     entry_max.insert(0, entry_max_init)
+    entry_min.grid(row=row, column=1)
+    entry_max.grid(row=row, column=2)
 
-    entry_min.grid(row=row, column=1, padx=3)
-    entry_max.grid(row=row, column=2, padx=3)
+    # Asc/Desc controls
+    tk.Radiobutton(window, text="⬆", value="asc", variable=order_var).grid(row=row, column=3)
+    tk.Radiobutton(window, text="⬇", value="desc", variable=order_var).grid(row=row, column=4)
 
     return entry_min, entry_max
 
 
-rating_min_entry, rating_max_entry = make_filter("rating", 1, "0", "5")
-pages_min_entry, pages_max_entry = make_filter("pages", 2, "0", "2000")
-ratings_count_min_entry, ratings_count_max_entry = make_filter("ratings_count", 3, "0", "5000000")
-reviews_min_entry, reviews_max_entry = make_filter("reviews", 4, "0", "100000")
-date_min_entry, date_max_entry = make_filter("date", 5, "1900", "2100")
+rating_min_entry, rating_max_entry = make_filter("rating", 1, "0", "5", rating_order)
+pages_min_entry, pages_max_entry = make_filter("pages", 2, "0", "2000", pages_order)
+ratings_count_min_entry, ratings_count_max_entry = make_filter("ratings_count", 3, "0", "5000000", ratings_order)
+reviews_min_entry, reviews_max_entry = make_filter("reviews", 4, "0", "100000", reviews_order)
+date_min_entry, date_max_entry = make_filter("date", 5, "1900", "2100", date_order)
 
-# Language Filter
+
+# Language filter with sorting
 tk.Checkbutton(window, text="Language", variable=lang_filter_var).grid(row=6, column=0, sticky="w")
 language_var = tk.StringVar(value="Any")
 language_box = ttk.Combobox(window, textvariable=language_var, values=["Any", "eng", "spa", "fre", "ger"], width=10)
 language_box.grid(row=6, column=1)
+
+tk.Radiobutton(window, text="⬆", value="asc", variable=lang_order).grid(row=6, column=3)
+tk.Radiobutton(window, text="⬇", value="desc", variable=lang_order).grid(row=6, column=4)
 
 
 # Results Table
 cols = ("ID", "Title", "Author", "Rating", "ISBN", "Lang", "Pages", "Ratings", "Reviews", "Year", "Publisher")
 tree = ttk.Treeview(window, columns=cols, show="headings", height=18)
 
-# Set compact column widths
-column_widths = [50, 250, 160, 60, 90, 60, 60, 80, 80, 80, 180]
-
+column_widths = [50, 230, 150, 60, 90, 60, 60, 80, 80, 80, 180]
 for col, w in zip(cols, column_widths):
     tree.heading(col, text=col)
     tree.column(col, width=w)
 
-tree.grid(row=7, column=0, columnspan=3, padx=5, pady=10)
+tree.grid(row=7, column=0, columnspan=5, padx=5, pady=10)
 
 
 window.mainloop()
