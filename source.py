@@ -67,13 +67,26 @@ def search_books():
             if not (date_min <= date <= date_max):
                 continue
         if filters_enabled["language"] and selected_language != "Any":
-            if row['language_code'] != selected_language:
-                continue
+            lang = row["language_code"]
 
-        results.append((row, nlp_score))
+            if selected_language == "eng":
+                if not lang.startswith("en"):
+                    continue
+
+            elif selected_language == "zho":
+                if not lang.startswith("zh"):
+                    continue
+
+            else:
+                if lang != selected_language:
+                    continue
+
+
+        results.append((row, nlp_score)) # Add tuples
 
     # Sorting logic WITH ASC/DESC settings
     if any(filters_enabled.values()):
+		# Sorting Priority: pages -> date -> ... -> reviews
         sort_rules = [
             ("pages", lambda x: int(x["num_pages"]), pages_order.get()),
             ("date", lambda x: int(x["publication_date"].split("/")[-1]), date_order.get()),
@@ -165,7 +178,7 @@ date_min_entry, date_max_entry = make_filter("date", 5, "1900", "2100", date_ord
 # Language filter with sorting
 tk.Checkbutton(window, text="Language", variable=lang_filter_var).grid(row=6, column=0, sticky="w")
 language_var = tk.StringVar(value="Any")
-language_box = ttk.Combobox(window, textvariable=language_var, values=["Any", "eng", "spa", "fre", "ger"], width=10)
+language_box = ttk.Combobox(window, textvariable=language_var, values=["Any", "eng", "spa", "fre", "ger", "zho"], width=10)
 language_box.grid(row=6, column=1)
 
 tk.Radiobutton(window, text="⬆", value="asc", variable=lang_order).grid(row=6, column=3)
