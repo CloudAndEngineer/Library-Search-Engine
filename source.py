@@ -23,6 +23,7 @@ def search_books():
     selected_language = language_var.get()
 
     filters_enabled = {
+        "nlp": nlp_filter_var.get(),
         "rating": rating_filter_var.get(),
         "pages": pages_filter_var.get(),
         "ratings_count": ratings_count_filter_var.get(),
@@ -86,8 +87,13 @@ def search_books():
 
     # Sorting logic WITH ASC/DESC settings
     if any(filters_enabled.values()):
-		# Sorting Priority: pages -> date -> ... -> reviews
+
+		#if filters_enabled["nlp"]:
+			#results.sort(key=lambda r: r[1], reverse=(nlp_order.get() == "desc"))
+
+        # Sorting Priority: pages -> date -> ... -> reviews
         sort_rules = [
+            ("nlp", lambda r: r[1], reverse=(nlp_order.get() == "desc")
             ("pages", lambda x: int(x["num_pages"]), pages_order.get()),
             ("date", lambda x: int(x["publication_date"].split("/")[-1]), date_order.get()),
             ("language", lambda x: x["language_code"], lang_order.get()),
@@ -126,6 +132,7 @@ window.title("Book Search Engine")
 
 
 # Sort order variables
+nlp_order = tk.StringVar(value="desc")
 rating_order = tk.StringVar(value="desc")
 pages_order = tk.StringVar(value="desc")
 ratings_order = tk.StringVar(value="desc")
@@ -142,6 +149,7 @@ tk.Button(window, text="🔍 Search", width=12, command=search_books).grid(row=0
 
 
 # Filter Controls
+nlp_filter_var = tk.BooleanVar()
 rating_filter_var = tk.BooleanVar()
 pages_filter_var = tk.BooleanVar()
 ratings_count_filter_var = tk.BooleanVar()
@@ -167,22 +175,27 @@ def make_filter(label, row, entry_min_init, entry_max_init, order_var):
 
     return entry_min, entry_max
 
+# NLP Accuracy Filter (Sorting Only)
+tk.Checkbutton(window, text="NLP Accuracy", variable=nlp_filter_var).grid(row=1, column=0, sticky="w")
+tk.Radiobutton(window, text="⬆", value="asc", variable=nlp_order).grid(row=1, column=3)
+tk.Radiobutton(window, text="⬇", value="desc", variable=nlp_order).grid(row=1, column=4)
 
-rating_min_entry, rating_max_entry = make_filter("rating", 1, "0", "5", rating_order)
-pages_min_entry, pages_max_entry = make_filter("pages", 2, "0", "2000", pages_order)
-ratings_count_min_entry, ratings_count_max_entry = make_filter("ratings_count", 3, "0", "5000000", ratings_order)
-reviews_min_entry, reviews_max_entry = make_filter("reviews", 4, "0", "100000", reviews_order)
-date_min_entry, date_max_entry = make_filter("date", 5, "1900", "2100", date_order)
+#Other Filters
+rating_min_entry, rating_max_entry = make_filter("rating", 2, "0", "5", rating_order)
+pages_min_entry, pages_max_entry = make_filter("pages", 3, "0", "2000", pages_order)
+ratings_count_min_entry, ratings_count_max_entry = make_filter("ratings_count", 4, "0", "5000000", ratings_order)
+reviews_min_entry, reviews_max_entry = make_filter("reviews", 5, "0", "100000", reviews_order)
+date_min_entry, date_max_entry = make_filter("date", 6, "1900", "2100", date_order)
 
 
 # Language filter with sorting
-tk.Checkbutton(window, text="Language", variable=lang_filter_var).grid(row=6, column=0, sticky="w")
+tk.Checkbutton(window, text="Language", variable=lang_filter_var).grid(row=7, column=0, sticky="w")
 language_var = tk.StringVar(value="Any")
 language_box = ttk.Combobox(window, textvariable=language_var, values=["Any", "eng", "spa", "fre", "ger", "zho"], width=10)
-language_box.grid(row=6, column=1)
+language_box.grid(row=7, column=1)
 
-tk.Radiobutton(window, text="⬆", value="asc", variable=lang_order).grid(row=6, column=3)
-tk.Radiobutton(window, text="⬇", value="desc", variable=lang_order).grid(row=6, column=4)
+tk.Radiobutton(window, text="⬆", value="asc", variable=lang_order).grid(row=7, column=3)
+tk.Radiobutton(window, text="⬇", value="desc", variable=lang_order).grid(row=7, column=4)
 
 
 # Results Table
@@ -194,7 +207,7 @@ for col, w in zip(cols, column_widths):
     tree.heading(col, text=col)
     tree.column(col, width=w)
 
-tree.grid(row=7, column=0, columnspan=5, padx=5, pady=10)
+tree.grid(row=8, column=0, columnspan=5, padx=5, pady=10)
 
 
 window.mainloop()
