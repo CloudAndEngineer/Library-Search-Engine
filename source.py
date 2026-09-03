@@ -104,7 +104,7 @@ def search_books():
     else:
         results.sort(key=lambda r: int(r[0]['bookID']))
 
-    display_results([item[0] for item in results])
+    display_results(results)
 
 
 # Display results
@@ -112,11 +112,11 @@ def display_results(data):
     for row in tree.get_children():
         tree.delete(row)
 
-    for book in data:
+    for book, score in data:
         tree.insert("", tk.END, values=(
             book['bookID'], book['title'], book['authors'], book['average_rating'], book['isbn'],
             book['language_code'], book['num_pages'], book['ratings_count'], book['text_reviews_count'],
-            book['publication_date'], book['publisher']
+            book['publication_date'], book['publisher'], round(score, 2)
         ))
 
 
@@ -186,10 +186,10 @@ tk.Radiobutton(window, text="⬇", value="desc", variable=lang_order).grid(row=6
 
 
 # Results Table
-cols = ("ID", "Title", "Author", "Rating", "ISBN", "Lang", "Pages", "Ratings", "Reviews", "Year", "Publisher")
+cols = ("ID", "Title", "Author", "Rating", "ISBN", "Lang", "Pages", "Ratings", "Reviews", "Year", "Publisher", "Accuracy")
 tree = ttk.Treeview(window, columns=cols, show="headings", height=18)
 
-column_widths = [50, 230, 150, 60, 90, 60, 60, 80, 80, 80, 180]
+column_widths = [50, 230, 150, 60, 90, 60, 60, 80, 80, 80, 180, 80]
 for col, w in zip(cols, column_widths):
     tree.heading(col, text=col)
     tree.column(col, width=w)
