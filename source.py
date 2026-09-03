@@ -1,31 +1,26 @@
 """
-GUI Book Finder Application
----------------------------------------------------
-Features:
-- Search books using fuzzy NLP matching (RapidFuzz similarity algorithm)
-- Sort results based on user-defined filters
-- Filtering numeric fields with user-selectable ranges
-- Efficient sorting using Python's built-in Timsort algorithm
-- Lazy evaluation using Pandas for performance on large datasets
+Added Feature Update:
+--------------------------------------------------
+✔ Each filter now includes an ON/OFF (Radio Button).
+✔ Only active filters are used for dataset filtering.
+✔ Sorting priority still follows same logic when any filter is active.
 """
 
+
 import pandas as pd
-from rapidfuzz import fuzz, process
+from rapidfuzz import fuzz
 import tkinter as tk
 from tkinter import ttk
-from tkinter import messagebox
 
 
 # ================================
 # Load dataset
 # ================================
 try:
-	df = pd.read_csv(r"E:\동건\가천대\2025-2\알고리즘\Project\books.csv")
+	df = pd.read_csv(r"E:동건\가천대\2025-2\알고리즘\Project\books.csv")
 except FileNotFoundError:
-    raise SystemExit("ERROR: books.csv not found in working directory!")
+    raise SystemExit("ERROR: books.csv not found!")
 
-
-# Ensure numeric columns are properly typed
 numeric_fields = ["average_rating", "num_pages", "ratings_count", "text_reviews_count"]
 for col in numeric_fields:
     df[col] = pd.to_numeric(df[col], errors="coerce")
@@ -33,19 +28,12 @@ for col in numeric_fields:
 df["publication_year"] = pd.to_datetime(df["publication_date"], errors="coerce").dt.year
 
 
+
 # ================================
-# Sorting Priority Logic
+# Sorting logic (Timsort)
 # ================================
 def sort_with_priority(data, filters_used):
-    """
-    Uses Python sorted() which uses Timsort - O(n log n).
-    Sorting priority only applies when at least one filter exists.
-    Priority order:
-    num_pages > publication_date > language_code > average_rating > rating_count > text_reviews_count
-    """
-
     if not filters_used:
-        # Default sorting by BookID when no filters are used
         return data.sort_values(by="bookID")
 
     priority = [
@@ -53,91 +41,94 @@ def sort_with_priority(data, filters_used):
         "average_rating", "ratings_count", "text_reviews_count"
     ]
 
-    existing_cols = [col for col in priority if col in data.columns]
+    valid_keys = [p for p in priority if p in data.columns]
+    return data.sort_values(by=valid_keys, ascending=False)
 
-    return data.sort_values(by=existing_cols, ascending=False)
 
 
 # ================================
-# NLP Fuzzy Search Function
-# Using RapidFuzz (efficient fuzzy matching)
+# NLP Searching
 # ================================
 def fuzzy_search(query, data):
-    """
-    Using token_set_ratio from RapidFuzz.
-    Algorithm Type: Fuzzy NLP matching (edit distance-based similarity algorithm).
-    Purpose: Finds approximate matches for messy or partial user input.
-    """
-
     if not query:
         return data
 
-    # Fields considered for flexible text search
     text_fields = ["title", "authors", "publisher"]
 
-    # Score each row based on max similarity across fields
-    def get_score(row):
-        return max(fuzz.token_set_ratio(query.lower(), str(row[col]).lower()) for col in text_fields)
+    def score(row):
+        return max(fuzz.token_set_ratio(query.lower(), str(row[c]).lower()) for c in text_fields)
 
-    data["similarity"] = data.apply(get_score, axis=1)
+    data["similarity"] = data.apply(score, axis=1)
 
-    # Threshold: ≥ 60 similarity considered relevant
     return data[data["similarity"] >= 60].sort_values(by="similarity", ascending=False)
 
 
+
 # ================================
-# Apply Filters
+# Filter Logic
 # ================================
 def apply_filters(data, filters):
     filtered = data.copy()
 
-    for col, (low, high) in filters.items():
-        if low is not None and high is not None:
+    for col, filter_data in filters.items():
+        enabled, low, high = filter_data
+        if enabled:
             filtered = filtered[(filtered[col] >= low) & (filtered[col] <= high)]
 
     return filtered
 
 
+
 # ================================
-# GUI Application
+# GUI CLASS
 # ================================
 class BookApp:
 
     def __init__(self, root):
         self.root = root
-        root.title("📚 Book Search System")
-        root.geometry("1100x650")
+        root.title("📚 Book Search System (With Filter Switches)")
+        root.geometry("1100x700")
 
-        # Search Box
-        tk.Label(root, text="Search (Title / Author / Publisher):").pack()
-        self.search_entry = tk.Entry(root, width=50)
+        tk.Label(root, text="Search Title / Author / Publisher:", font=("Arial", 11)).pack(pady=5)
+        self.search_entry = tk.Entry(root, width=60)
         self.search_entry.pack()
 
-        # Filters Frame
+        # === Filter Section ===
         filter_frame = tk.Frame(root)
         filter_frame.pack(pady=10)
 
-        self.filters = {}
+        self.filter_settings = {}
 
-        def create_slider(label, col, min_val, max_val):
-            tk.Label(filter_frame, text=label).grid()
-            min_var = tk.DoubleVar()
-            max_var = tk.DoubleVar()
-            ttk.Scale(filter_frame, from_=min_val, to=max_val, variable=min_var).grid()
-            ttk.Scale(filter_frame, from_=min_val, to=max_val, variable=max_var).grid()
-            self.filters[col] = (min_var, max_var)
+        def create_filter_row(label, col_name, min_val, max_val):
+            row = tk.Frame(filter_frame)
+            row.pack(anchor="w", pady=3)
 
-        create_slider("Average Rating", "average_rating", 0, 5)
-        create_slider("Num Pages", "num_pages", 0, 2000)
-        create_slider("Ratings Count", "ratings_count", 0, 1_000_000)
-        create_slider("Text Reviews Count", "text_reviews_count", 0, 50_000)
-        create_slider("Publication Year", "publication_year", 1900, 2025)
+            tk.Label(row, text=f"{label}").pack(side="left")
 
-        # Language Dropdown
-        tk.Label(root, text="Language:").pack()
-        self.language_var = tk.StringVar()
-        languages = ["(Any)"] + sorted(df["language_code"].dropna().unique())
-        ttk.Combobox(root, textvariable=self.language_var, values=languages).pack()
+            status_var = tk.IntVar(value=0)  # Default OFF (0 = disabled, 1 = enabled)
+            tk.Radiobutton(row, text="Off", variable=status_var, value=0).pack(side="left")
+            tk.Radiobutton(row, text="On", variable=status_var, value=1).pack(side="left")
+
+            # Range sliders
+            min_var = tk.DoubleVar(value=min_val)
+            max_var = tk.DoubleVar(value=max_val)
+
+            ttk.Scale(row, from_=min_val, to=max_val, variable=min_var).pack(side="left", padx=5)
+            ttk.Scale(row, from_=min_val, to=max_val, variable=max_var).pack(side="left", padx=5)
+
+            self.filter_settings[col_name] = (status_var, min_var, max_var)
+
+        create_filter_row("Avg Rating", "average_rating", 0, 5)
+        create_filter_row("Num Pages", "num_pages", 0, 2000)
+        create_filter_row("Ratings Count", "ratings_count", 0, 1_000_000)
+        create_filter_row("Text Review Count", "text_reviews_count", 0, 50_000)
+        create_filter_row("Publication Year", "publication_year", 1900, 2025)
+
+        # Language Filter
+        tk.Label(root, text="Language:", font=("Arial", 10)).pack()
+        self.language_var = tk.StringVar(value="(Any)")
+        language_options = ["(Any)"] + sorted(df["language_code"].dropna().unique())
+        ttk.Combobox(root, textvariable=self.language_var, values=language_options).pack()
 
         # Search Button
         ttk.Button(root, text="Search", command=self.run_search).pack(pady=10)
@@ -148,42 +139,50 @@ class BookApp:
             self.tree.heading(col, text=col)
         self.tree.pack(expand=True, fill="both")
 
+
+
     def run_search(self):
         query = self.search_entry.get().strip()
 
         results = df.copy()
 
-        # Apply NLP search
+        # NLP fuzzy matching
         results = fuzzy_search(query, results)
 
-        # Apply numerical filters
-        used_filters = False
-        active_ranges = {}
-        for col, (low_var, high_var) in self.filters.items():
-            low, high = low_var.get(), high_var.get()
-            if low > 0 or high < df[col].max():
-                active_ranges[col] = (low, high)
-                used_filters = True
+        filters_used = False
+        compiled_filters = {}
 
-        if active_ranges:
-            results = apply_filters(results, active_ranges)
+        for col, filter_data in self.filter_settings.items():
+            enabled = filter_data[0].get() == 1
+            low = filter_data[1].get()
+            high = filter_data[2].get()
 
-        # Apply language filter
-        if self.language_var.get() != "(Any)" and self.language_var.get().strip():
+            if enabled:
+                compiled_filters[col] = (True, low, high)
+                filters_used = True
+            else:
+                compiled_filters[col] = (False, low, high)
+
+        # Apply filters
+        results = apply_filters(results, compiled_filters)
+
+        # Language filter
+        if self.language_var.get() != "(Any)":
             results = results[results["language_code"] == self.language_var.get()]
-            used_filters = True
+            filters_used = True
 
-        # Sorting based on rules
-        results = sort_with_priority(results, used_filters)
+        # Sorting rule
+        results = sort_with_priority(results, filters_used)
 
         # Display
         self.tree.delete(*self.tree.get_children())
-        for _, row in results.head(200).iterrows():
-            self.tree.insert("", tk.END, values=(row["bookID"], row["title"], row["authors"], row["average_rating"]))
+        for _, r in results.head(200).iterrows():
+            self.tree.insert("", tk.END, values=(r["bookID"], r["title"], r["authors"], r["average_rating"]))
+
 
 
 # ================================
-# Run Program
+# Run GUI
 # ================================
 root = tk.Tk()
 app = BookApp(root)
